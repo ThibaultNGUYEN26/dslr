@@ -27,13 +27,14 @@ function App() {
   const [datasetLoading, setDatasetLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeView, setActiveView] = useState("histograms");
-  const [pairMode, setPairMode] = useState("selected");
+  const [pairMode, setPairMode] = useState("focused");
+  const [pairFeatureX, setPairFeatureX] = useState("");
+  const [pairFeatureY, setPairFeatureY] = useState("");
   const [scatterMode, setScatterMode] = useState("top");
   const [histogramSort, setHistogramSort] = useState("dataset");
-  const [scatterSort, setScatterSort] = useState("similarity");
+  const [scatterSort, setScatterSort] = useState("dataset");
   const [selectedHistogram, setSelectedHistogram] = useState(null);
   const [selectedScatterPair, setSelectedScatterPair] = useState(null);
-  const [cacheKey, setCacheKey] = useState(Date.now());
 
   async function loadData() {
     setLoading(true);
@@ -70,7 +71,6 @@ function App() {
       setPairPlot(pairPlotData);
       setScatterPlot(scatterPlotData);
       setDatasetList(datasetsData.datasets);
-      setCacheKey(Date.now());
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -110,6 +110,14 @@ function App() {
 
     loadDatasetRows();
   }, [activeDataset, datasetOffset, datasetPageSize, datasetQuery]);
+
+  useEffect(() => {
+    if (!pairPlot || pairPlot.features.length < 2) {
+      return;
+    }
+    setPairFeatureX((currentFeature) => currentFeature || pairPlot.features[0]);
+    setPairFeatureY((currentFeature) => currentFeature || pairPlot.features[1]);
+  }, [pairPlot]);
 
   useEffect(() => {
     function closeOnEscape(event) {
@@ -156,11 +164,17 @@ function App() {
     if (!pairPlot) {
       return "";
     }
-    const image =
-      pairMode === "selected" ? pairPlot.defaultImage : pairPlot.allFeaturesImage;
-    const separator = image.includes("?") ? "&" : "?";
-    return `${image}${separator}v=${cacheKey}`;
-  }, [pairMode, pairPlot, cacheKey]);
+    if (pairMode === "all") {
+      return pairPlot.allFeaturesImage;
+    }
+    if (pairMode === "focused" && pairFeatureX && pairFeatureY) {
+      const params = new URLSearchParams({
+        features: `${pairFeatureX},${pairFeatureY}`,
+      });
+      return `/api/pair-plot.png?${params}`;
+    }
+    return pairPlot.defaultImage;
+  }, [pairFeatureX, pairFeatureY, pairMode, pairPlot]);
 
   const scatterPairs = useMemo(() => {
     if (!scatterPlot) {
@@ -182,14 +196,14 @@ function App() {
         )
       );
     }
-    if (scatterSort === "similarity") {
+    if (scatterSort === "pearsonDesc") {
       nextPairs = [...nextPairs].sort(
-        (left, right) => Math.abs(right.correlation) - Math.abs(left.correlation)
+        (left, right) => right.correlation - left.correlation
       );
     }
-    if (scatterSort === "dissimilarity") {
+    if (scatterSort === "pearsonAsc") {
       nextPairs = [...nextPairs].sort(
-        (left, right) => Math.abs(left.correlation) - Math.abs(right.correlation)
+        (left, right) => left.correlation - right.correlation
       );
     }
 
@@ -198,11 +212,6 @@ function App() {
     }
     return nextPairs.slice(0, 12);
   }, [scatterMode, scatterPlot, scatterSort]);
-
-  function withCacheKey(image) {
-    const separator = image.includes("?") ? "&" : "?";
-    return `${image}${separator}v=${cacheKey}`;
-  }
 
   const datasetEnd = datasetRows
     ? Math.min(datasetRows.offset + datasetRows.rows.length, datasetRows.total)
@@ -222,18 +231,18 @@ function App() {
 
       <section className="view-tabs" aria-label="Plot views">
         <button
+          className={activeView === "datasets" ? "tab active" : "tab"}
+          onClick={() => setActiveView("datasets")}
+        >
+          <Database size={18} />
+          Datasets
+        </button>
+        <button
           className={activeView === "histograms" ? "tab active" : "tab"}
           onClick={() => setActiveView("histograms")}
         >
           <BarChart3 size={18} />
           Histograms
-        </button>
-        <button
-          className={activeView === "pairPlot" ? "tab active" : "tab"}
-          onClick={() => setActiveView("pairPlot")}
-        >
-          <Grid3X3 size={18} />
-          Pair Plot
         </button>
         <button
           className={activeView === "scatterPlot" ? "tab active" : "tab"}
@@ -243,11 +252,11 @@ function App() {
           Scatter Plot
         </button>
         <button
-          className={activeView === "datasets" ? "tab active" : "tab"}
-          onClick={() => setActiveView("datasets")}
+          className={activeView === "pairPlot" ? "tab active" : "tab"}
+          onClick={() => setActiveView("pairPlot")}
         >
-          <Database size={18} />
-          Datasets
+          <Grid3X3 size={18} />
+          Pair Plot
         </button>
       </section>
 
@@ -281,21 +290,69 @@ function App() {
         <section className="toolbar" aria-label="Pair plot controls">
           <div className="summary">
             <Grid3X3 size={20} />
-            <span>{pairMode === "selected" ? "Selected features" : "All numeric features"}</span>
+            <span>
+              {pairMode === "focused"
+                ? `${pairFeatureX || "Feature"} x ${pairFeatureY || "Feature"}`
+                : pairMode === "selected"
+                  ? "Selected features"
+                  : "All numeric features"}
+            </span>
           </div>
-          <div className="segmented" role="group" aria-label="Pair plot feature mode">
-            <button
-              className={pairMode === "selected" ? "active" : ""}
-              onClick={() => setPairMode("selected")}
-            >
-              Selected
-            </button>
-            <button
-              className={pairMode === "all" ? "active" : ""}
-              onClick={() => setPairMode("all")}
-            >
-              All
-            </button>
+          <div className="toolbar-actions">
+            {pairPlot && pairMode === "focused" && (
+              <div className="select-group selected-pair-controls">
+                <select
+                  value={pairFeatureX}
+                  onChange={(event) => setPairFeatureX(event.target.value)}
+                  aria-label="Select pair plot column feature"
+                >
+                  {pairPlot.features.map((feature) => (
+                    <option
+                      disabled={feature === pairFeatureY}
+                      key={feature}
+                      value={feature}
+                    >
+                      Column: {feature}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={pairFeatureY}
+                  onChange={(event) => setPairFeatureY(event.target.value)}
+                  aria-label="Select pair plot row feature"
+                >
+                  {pairPlot.features.map((feature) => (
+                    <option
+                      disabled={feature === pairFeatureX}
+                      key={feature}
+                      value={feature}
+                    >
+                      Row: {feature}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div className="segmented" role="group" aria-label="Pair plot feature mode">
+              <button
+                className={pairMode === "focused" ? "active" : ""}
+                onClick={() => setPairMode("focused")}
+              >
+                Focused
+              </button>
+              <button
+                className={pairMode === "selected" ? "active" : ""}
+                onClick={() => setPairMode("selected")}
+              >
+                Selected
+              </button>
+              <button
+                className={pairMode === "all" ? "active" : ""}
+                onClick={() => setPairMode("all")}
+              >
+                All
+              </button>
+            </div>
           </div>
         </section>
       )}
@@ -308,8 +365,8 @@ function App() {
               {!scatterPlot
                 ? "Loading scatter plot"
                 : scatterMode === "all"
-                  ? `${scatterPlot.pairs.length} feature pairs`
-                  : `Top ${Math.min(12, scatterPlot.pairs.length)} feature pairs`}
+                  ? `${scatterPairs.length} of ${scatterPlot.pairs.length} feature pairs`
+                  : `${scatterPairs.length} of ${scatterPlot.pairs.length} feature pairs`}
             </span>
           </div>
           <div className="segmented" role="group" aria-label="Scatter plot pair mode">
@@ -332,8 +389,9 @@ function App() {
               onChange={(event) => setScatterSort(event.target.value)}
               aria-label="Sort scatter plot pairs"
             >
-              <option value="similarity">Most similar</option>
-              <option value="dissimilarity">Least similar</option>
+              <option value="dataset">Dataset order</option>
+              <option value="pearsonDesc">Pearson r high to low</option>
+              <option value="pearsonAsc">Pearson r low to high</option>
               <option value="az">A to Z</option>
               <option value="za">Z to A</option>
             </select>
@@ -414,7 +472,7 @@ function App() {
                 </span>
               </div>
               <img
-                src={`${feature.image}?v=${cacheKey}`}
+                src={feature.image}
                 alt={`${feature.name} histogram by Hogwarts house`}
                 loading="lazy"
               />
@@ -424,7 +482,10 @@ function App() {
       )}
 
       {!loading && !error && activeView === "pairPlot" && pairPlot && (
-        <section className="plot-panel" aria-label="Pair plot">
+        <section
+          className={pairMode === "focused" ? "plot-panel focused-pair-panel" : "plot-panel"}
+          aria-label="Pair plot"
+        >
           <img src={pairPlotImage} alt="Hogwarts course pair plot" />
         </section>
       )}
@@ -441,11 +502,11 @@ function App() {
               <div className="card-title">
                 <span>{pair.featureX}</span>
                 <span className="card-meta">
-                  vs {pair.featureY} | r {pair.correlation.toFixed(6)}
+                  vs {pair.featureY} | Pearson r {pair.correlation.toFixed(6)}
                 </span>
               </div>
               <img
-                src={withCacheKey(pair.image)}
+                src={pair.image}
                 alt={`${pair.featureX} versus ${pair.featureY} scatter plot`}
                 loading="lazy"
               />
@@ -536,7 +597,7 @@ function App() {
               </button>
             </header>
             <img
-              src={`${selectedHistogram.image}?v=${cacheKey}`}
+              src={selectedHistogram.image}
               alt={`${selectedHistogram.name} histogram by Hogwarts house`}
             />
           </section>
@@ -561,7 +622,7 @@ function App() {
                 <p className="eyebrow">Scatter plot</p>
                 <h2>{selectedScatterPair.featureX}</h2>
                 <p className="modal-subtitle">
-                  vs {selectedScatterPair.featureY} | r{" "}
+                  vs {selectedScatterPair.featureY} | Pearson r{" "}
                   {selectedScatterPair.correlation.toFixed(6)}
                 </p>
               </div>
@@ -575,7 +636,7 @@ function App() {
               </button>
             </header>
             <img
-              src={withCacheKey(selectedScatterPair.image)}
+              src={selectedScatterPair.image}
               alt={`${selectedScatterPair.featureX} versus ${selectedScatterPair.featureY} scatter plot`}
             />
           </section>

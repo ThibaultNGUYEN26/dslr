@@ -32,6 +32,9 @@ DATASETS = {
     "test": ROOT_DIR / "datasets" / "dataset_test.csv",
 }
 PLOT_DIR = ROOT_DIR / "outputs" / "web_plots"
+HISTOGRAM_SCRIPT = ROOT_DIR / "src" / "data_visualization" / "histogram.py"
+PAIR_PLOT_SCRIPT = ROOT_DIR / "src" / "data_visualization" / "pair_plot.py"
+SCATTER_PLOT_SCRIPT = ROOT_DIR / "src" / "data_visualization" / "scatter_plot.py"
 
 
 app = Flask(__name__)
@@ -95,6 +98,34 @@ def scatter_plot_pairs():
         raise ScatterPlotError("could not compare numerical feature pairs")
     pairs.sort(key=lambda pair: abs(pair["correlation"]), reverse=True)
     return pairs
+
+
+def plot_is_current(output_path, sources):
+    if not output_path.exists():
+        return False
+
+    output_mtime = output_path.stat().st_mtime
+    for source in sources:
+        if source.exists() and source.stat().st_mtime > output_mtime:
+            return False
+    return True
+
+
+def generate_plot_if_needed(output_path, sources, command, error_label):
+    PLOT_DIR.mkdir(parents=True, exist_ok=True)
+    if plot_is_current(output_path, sources):
+        return None
+
+    result = subprocess.run(
+        command,
+        cwd=ROOT_DIR,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return result.stderr.strip() or result.stdout.strip() or f"{error_label} failed"
+    return None
 
 
 def read_dataset(dataset_name):
@@ -198,27 +229,24 @@ def histogram_image(slug):
     if feature is None:
         return jsonify({"error": f"unknown histogram: {slug}"}), 404
 
-    PLOT_DIR.mkdir(parents=True, exist_ok=True)
     output_path = PLOT_DIR / f"{slug}.png"
 
     command = [
         sys.executable,
-        str(ROOT_DIR / "src" / "data_visualization" / "histogram.py"),
+        str(HISTOGRAM_SCRIPT),
         str(DATASET_PATH),
         feature,
         "--no-show",
         "--save",
         str(output_path),
     ]
-    result = subprocess.run(
+    message = generate_plot_if_needed(
+        output_path,
+        [DATASET_PATH, HISTOGRAM_SCRIPT],
         command,
-        cwd=ROOT_DIR,
-        capture_output=True,
-        text=True,
-        check=False,
+        "histogram",
     )
-    if result.returncode != 0:
-        message = result.stderr.strip() or result.stdout.strip() or "histogram failed"
+    if message is not None:
         return jsonify({"error": message}), 500
 
     return send_file(output_path, mimetype="image/png")
@@ -226,9 +254,15 @@ def histogram_image(slug):
 
 @app.get("/api/pair-plot")
 def pair_plot():
+    try:
+        features = numerical_features()
+    except HistogramError as error:
+        return jsonify({"error": str(error)}), 400
+
     return jsonify(
         {
             "dataset": str(DATASET_PATH.relative_to(ROOT_DIR)),
+            "features": features,
             "defaultImage": "/api/pair-plot.png",
             "allFeaturesImage": "/api/pair-plot.png?all=1",
         }
@@ -238,12 +272,37 @@ def pair_plot():
 @app.get("/api/pair-plot.png")
 def pair_plot_image():
     use_all = "all" in flask_request.args
-    PLOT_DIR.mkdir(parents=True, exist_ok=True)
-    output_path = PLOT_DIR / ("pair_plot_all.png" if use_all else "pair_plot.png")
+    raw_features = flask_request.args.get("features", "").strip()
+    if use_all and raw_features:
+        return jsonify({"error": "provide either all or features, not both"}), 400
+
+    selected_features = []
+    if raw_features:
+        try:
+            available_features = numerical_features()
+        except HistogramError as error:
+            return jsonify({"error": str(error)}), 400
+
+        for feature in raw_features.split(","):
+            feature = feature.strip()
+            if not feature:
+                continue
+            if feature not in available_features:
+                return jsonify({"error": f"unknown feature: {feature}"}), 400
+            selected_features.append(feature)
+
+        if len(selected_features) != 2:
+            return jsonify({"error": "select exactly two features"}), 400
+
+    if selected_features:
+        slug = "_".join(feature_slug(feature) for feature in selected_features)
+        output_path = PLOT_DIR / f"pair_plot_{slug}.png"
+    else:
+        output_path = PLOT_DIR / ("pair_plot_all.png" if use_all else "pair_plot.png")
 
     command = [
         sys.executable,
-        str(ROOT_DIR / "src" / "data_visualization" / "pair_plot.py"),
+        str(PAIR_PLOT_SCRIPT),
         str(DATASET_PATH),
         "--no-show",
         "--save",
@@ -251,16 +310,17 @@ def pair_plot_image():
     ]
     if use_all:
         command.insert(4, "--all")
+    if selected_features:
+        command.insert(4, "--features")
+        command.insert(5, ",".join(selected_features))
 
-    result = subprocess.run(
+    message = generate_plot_if_needed(
+        output_path,
+        [DATASET_PATH, PAIR_PLOT_SCRIPT],
         command,
-        cwd=ROOT_DIR,
-        capture_output=True,
-        text=True,
-        check=False,
+        "pair plot",
     )
-    if result.returncode != 0:
-        message = result.stderr.strip() or result.stdout.strip() or "pair plot failed"
+    if message is not None:
         return jsonify({"error": message}), 500
 
     return send_file(output_path, mimetype="image/png")
@@ -295,7 +355,6 @@ def scatter_plot_image():
     if (feature_x == "") != (feature_y == ""):
         return jsonify({"error": "provide either both features or no feature"}), 400
 
-    PLOT_DIR.mkdir(parents=True, exist_ok=True)
     if feature_x and feature_y:
         output_path = PLOT_DIR / f"scatter_{feature_slug(feature_x)}_{feature_slug(feature_y)}.png"
     else:
@@ -303,22 +362,20 @@ def scatter_plot_image():
 
     command = [
         sys.executable,
-        str(ROOT_DIR / "src" / "data_visualization" / "scatter_plot.py"),
+        str(SCATTER_PLOT_SCRIPT),
         str(DATASET_PATH),
     ]
     if feature_x and feature_y:
         command.extend([feature_x, feature_y])
     command.extend(["--no-show", "--save", str(output_path)])
 
-    result = subprocess.run(
+    message = generate_plot_if_needed(
+        output_path,
+        [DATASET_PATH, SCATTER_PLOT_SCRIPT],
         command,
-        cwd=ROOT_DIR,
-        capture_output=True,
-        text=True,
-        check=False,
+        "scatter plot",
     )
-    if result.returncode != 0:
-        message = result.stderr.strip() or result.stdout.strip() or "scatter plot failed"
+    if message is not None:
         return jsonify({"error": message}), 500
 
     return send_file(output_path, mimetype="image/png")

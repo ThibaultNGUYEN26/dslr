@@ -139,6 +139,14 @@ select {
   gap: 10px;
 }
 
+.toolbar-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
 .filter-row {
   display: flex;
   flex-wrap: wrap;
@@ -253,6 +261,12 @@ select {
   display: block;
   min-width: 980px;
   width: 100%;
+}
+
+.focused-pair-panel img {
+  margin: 0 auto;
+  max-width: 820px;
+  min-width: 0;
 }
 
 .dataset-panel {
@@ -390,7 +404,8 @@ tbody tr:nth-child(even) {
   }
 
   .filter-row,
-  .select-group {
+  .select-group,
+  .toolbar-actions {
     flex-direction: column;
   }
 
