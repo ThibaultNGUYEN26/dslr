@@ -6,7 +6,6 @@ import {
   ChevronRight,
   Database,
   Grid3X3,
-  RefreshCcw,
   ScatterChart,
   X,
 } from "lucide-react";
@@ -224,9 +223,6 @@ function App() {
           <p className="eyebrow">DSLR visualization</p>
           <h1>Hogwarts course plots</h1>
         </div>
-        <button className="icon-button" onClick={loadData} title="Reload">
-          <RefreshCcw size={18} />
-        </button>
       </header>
 
       <section className="view-tabs" aria-label="Plot views">
