@@ -121,7 +121,7 @@ def train_one_house(X, y, target_house, training_config):
 
 	if batch_size is None :
 		batch_size = len(X)
-		
+
 	if epochs <= 0 :
 		raise ValueError("epochs must be greater than 0")
 	if learning_rate <= 0 :
@@ -184,7 +184,7 @@ def compute_z(weights, student_values, bias) :
 		value = student_values[index]
 		weight = weights[index]
 		z += weight * value
-	return z	
+	return z
 
 def apply_standardization(X, means, stds, features) :
 	# valeur_standardisée = (valeur - moyenne_de_la_feature) / écart_type_de_la_feature
@@ -237,7 +237,7 @@ def compute_imputation_means(X, features) :
 	return imputation_means
 
 def prepare_training_data(csv_path) :
-	X = [] 
+	X = []
 	y = []
 	preprocessing_params = {}
 	features = DEFAULT_FEATURES
@@ -267,7 +267,7 @@ def parse_arguments() :
 	parser = argparse.ArgumentParser(description="Train a logistic regression model.")
 	parser.add_argument("dataset", help="CSV training dataset path")
 	parser.add_argument("--learning-rate", type=float, default=0.01, help="learning rate, default: 0.01")
-	parser.add_argument("--epochs", type=int, default=1000, help="number of training epochs, default: 1000")
+	parser.add_argument("--epochs", type=int, default=1600, help="number of training epochs, default: 1600")
 	parser.add_argument("--batch-size", type=int, default=None, help="mini-batch size; default uses the full dataset")
 	parser.add_argument("--compare-optimizers", action="store_true", help="also train batch, stochastic, and mini-batch models for comparison")
 	return parser.parse_args()
