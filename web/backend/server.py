@@ -1,6 +1,8 @@
 import csv
+import json
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlencode
 
@@ -24,6 +26,12 @@ from src.data_visualization.scatter_plot import (
     find_most_similar_features,
     pearson_correlation,
 )
+from src.data_analysis.describe import (
+    DescribeError,
+    STAT_NAMES,
+    build_describe_table,
+)
+from src.logistic_regression.logreg_train import sigmoid
 
 
 DATASET_PATH = ROOT_DIR / "datasets" / "dataset_train.csv"
@@ -35,9 +43,16 @@ PLOT_DIR = ROOT_DIR / "outputs" / "web_plots"
 HISTOGRAM_SCRIPT = ROOT_DIR / "src" / "data_visualization" / "histogram.py"
 PAIR_PLOT_SCRIPT = ROOT_DIR / "src" / "data_visualization" / "pair_plot.py"
 SCATTER_PLOT_SCRIPT = ROOT_DIR / "src" / "data_visualization" / "scatter_plot.py"
+MODEL_PATH = ROOT_DIR / "models" / "weights.json"
 
 
 app = Flask(__name__)
+
+
+def model_updated_at():
+    return datetime.fromtimestamp(
+        MODEL_PATH.stat().st_mtime, timezone.utc
+    ).isoformat()
 
 
 def feature_slug(feature):
@@ -194,6 +209,196 @@ def dataset_rows(dataset_name):
             "limit": limit,
             "offset": offset,
             "total": total,
+        }
+    )
+
+
+@app.get("/api/describe/<dataset_name>")
+def describe_dataset(dataset_name):
+    path = DATASETS.get(dataset_name)
+    if path is None:
+        return jsonify({"error": f"unknown dataset: {dataset_name}"}), 404
+
+    try:
+        table = build_describe_table(path)
+    except (DescribeError, OSError) as error:
+        return jsonify({"error": str(error)}), 400
+
+    return jsonify(
+        {
+            "name": dataset_name,
+            "path": str(path.relative_to(ROOT_DIR)),
+            "statistics": list(STAT_NAMES),
+            "features": [
+                {"name": feature, "values": values}
+                for feature, values in table.items()
+            ],
+        }
+    )
+
+
+@app.get("/api/training-loss")
+def training_loss():
+    try:
+        with MODEL_PATH.open() as model_file:
+            model = json.load(model_file)
+    except FileNotFoundError:
+        return jsonify({"error": "trained model not found"}), 404
+    except json.JSONDecodeError:
+        return jsonify({"error": "trained model is not valid JSON"}), 500
+
+    histories = model.get("optimizer_loss_history", {})
+    house_histories = model.get("optimizer_house_loss_history", {})
+    houses = model.get("houses", [])
+    strategy_names = {
+        "batch": "Batch",
+        "stochastic": "Stochastic",
+        "mini_batch": "Mini-batch",
+    }
+    strategies = [strategy for strategy in strategy_names if histories.get(strategy)]
+    if len(strategies) != len(strategy_names):
+        return jsonify({"error": "retrain the model to compare optimizer losses"}), 409
+    if not houses or any(
+        not house_histories.get(strategy, {}).get(house)
+        for strategy in strategies
+        for house in houses
+    ):
+        return jsonify({"error": "retrain the model to compare per-house losses"}), 409
+
+    epoch_count = min(
+        [len(histories[strategy]) for strategy in strategies]
+        + [
+            len(house_histories[strategy][house])
+            for strategy in strategies
+            for house in houses
+        ]
+    )
+
+    return jsonify(
+        {
+            "model": str(MODEL_PATH.relative_to(ROOT_DIR)),
+            "modelUpdatedAt": model_updated_at(),
+            "epochs": epoch_count,
+            "trainingConfig": model.get("training_config", {}),
+            "optimizerConfigs": model.get("optimizer_configs", {}),
+            "series": [
+                {
+                    "name": strategy_names[strategy],
+                    "strategy": strategy,
+                    "kind": "optimizer",
+                    "values": histories[strategy][:epoch_count],
+                }
+                for strategy in strategies
+            ],
+            "houseSeries": {
+                strategy: [
+                    {
+                        "name": house,
+                        "strategy": strategy,
+                        "kind": "house",
+                        "values": house_histories[strategy][house][:epoch_count],
+                    }
+                    for house in houses
+                ]
+                for strategy in strategies
+            },
+        }
+    )
+
+
+@app.get("/api/regression-curves")
+def regression_curves():
+    try:
+        with MODEL_PATH.open() as model_file:
+            model = json.load(model_file)
+    except FileNotFoundError:
+        return jsonify({"error": "trained model not found"}), 404
+    except json.JSONDecodeError:
+        return jsonify({"error": "trained model is not valid JSON"}), 500
+
+    preprocessing = model.get("preprocessing_params", {})
+    features = preprocessing.get("features", [])
+    houses = model.get("houses", [])
+    optimizer_models = model.get("optimizer_models", {})
+    if not features or not houses or not optimizer_models:
+        return jsonify({"error": "retrain the model to generate regression curves"}), 409
+
+    default_house = "Hufflepuff" if "Hufflepuff" in houses else houses[0]
+    house = flask_request.args.get("house", default_house).strip()
+    if house not in houses:
+        return jsonify({"error": f"unknown house: {house}"}), 400
+
+    _, _, rows = read_dataset("train")
+    prepared_rows = []
+    for row in rows:
+        student_values = []
+        for feature in features:
+            raw_value = row.get(feature, "").strip()
+            try:
+                value = float(raw_value) if raw_value else preprocessing["imputation_means"][feature]
+            except ValueError:
+                value = preprocessing["imputation_means"][feature]
+            mean = preprocessing["standardization_means"][feature]
+            std = preprocessing["standardization_stds"][feature]
+            student_values.append(0.0 if std == 0 else (value - mean) / std)
+        prepared_rows.append(
+            (
+                student_values,
+                1 if row.get("Hogwarts House", "").strip() == house else 0,
+            )
+        )
+
+    strategy_names = {
+        "batch": "Batch",
+        "stochastic": "Stochastic",
+        "mini_batch": "Mini-batch",
+    }
+    series = []
+    sample_count = 160
+    for strategy, name in strategy_names.items():
+        strategy_model = optimizer_models.get(strategy)
+        if strategy_model is None:
+            return jsonify({"error": f"missing optimizer model: {strategy}"}), 409
+        weights = strategy_model["weights"][house]
+        bias = strategy_model["biases"][house]
+        points = []
+        for student_values, label in prepared_rows:
+            score = bias
+            for index in range(len(weights)):
+                score += weights[index] * student_values[index]
+            points.append({"x": score, "y": label})
+
+        minimum = points[0]["x"]
+        maximum = points[0]["x"]
+        for point in points:
+            if point["x"] < minimum:
+                minimum = point["x"]
+            if point["x"] > maximum:
+                maximum = point["x"]
+
+        curve = []
+        for index in range(sample_count):
+            ratio = index / (sample_count - 1)
+            x_value = minimum + ratio * (maximum - minimum)
+            curve.append({"x": x_value, "y": sigmoid(x_value)})
+        series.append(
+            {
+                "name": name,
+                "strategy": strategy,
+                "values": curve,
+                "points": points,
+            }
+        )
+
+    return jsonify(
+        {
+            "dataset": str(DATASET_PATH.relative_to(ROOT_DIR)),
+            "model": str(MODEL_PATH.relative_to(ROOT_DIR)),
+            "modelUpdatedAt": model_updated_at(),
+            "featureCount": len(features),
+            "house": house,
+            "houses": houses,
+            "series": series,
         }
     )
 

@@ -5,7 +5,20 @@ from pathlib import Path
 from src.data_analysis.statistics import describe_values
 
 
-STAT_NAMES = ("Count", "Mean", "Std", "Min", "25%", "50%", "75%", "Max")
+STAT_NAMES = (
+    "Count",
+    "Missing",
+    "Mean",
+    "Std",
+    "Variance",
+    "Min",
+    "25%",
+    "50%",
+    "75%",
+    "Max",
+    "Range",
+    "IQR",
+)
 
 
 class DescribeError(Exception):
@@ -43,9 +56,11 @@ def load_numeric_columns(csv_path):
 
         columns = []
         for name in header:
-            columns.append({"name": name, "values": []})
+            columns.append({"name": name, "values": [], "total_count": 0})
 
         for row in reader:
+            for column in columns:
+                column["total_count"] += 1
             for index, cell in enumerate(row):
                 if index >= len(columns):
                     continue
@@ -67,7 +82,9 @@ def build_describe_table(csv_path):
     numeric_columns = load_numeric_columns(csv_path)
     table = {}
     for column in numeric_columns:
-        table[column["name"]] = describe_values(column["values"])
+        table[column["name"]] = describe_values(
+            column["values"], column["total_count"]
+        )
     return table
 
 

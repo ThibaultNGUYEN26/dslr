@@ -1,15 +1,19 @@
 import argparse
 import math
 import json
+import random
+from pathlib import Path
 from src.data_visualization.pair_plot import load_rows ,parse_float ,DEFAULT_FEATURES
 from src.data_analysis.statistics import ft_mean, ft_std
 
 HOUSES = ["Gryffindor", "Hufflepuff", "Ravenclaw", "Slytherin"]
 
 def save_model(model) :
-	output_path = "models/weights.json"
-	with open(output_path, "w") as file :
+	output_path = Path("models/weights.json")
+	temporary_path = output_path.with_suffix(".json.tmp")
+	with temporary_path.open("w") as file :
 		json.dump(model, file, indent=2)
+	temporary_path.replace(output_path)
 
 def update_parameters(weights, bias, gradient_weights, gradient_bias, lr) :
 	for index in range(len(weights)) :
@@ -44,18 +48,69 @@ def gradient_descent(X, y, weights, bias, lr) :
 	weights, bias = update_parameters(weights, bias, gradient_weights, gradient_bias, lr)
 	return weights, bias
 
+def binary_cross_entropy(X, y, weights, bias) :
+	if len(X) == 0:
+		raise ValueError("cannot compute loss with empty training data")
+
+	loss = 0.0
+	epsilon = 1e-15
+	for index in range(len(X)) :
+		prediction = sigmoid(compute_z(weights, X[index], bias))
+		prediction = max(epsilon, min(1.0 - epsilon, prediction))
+		true_label = y[index]
+		loss -= true_label * math.log(prediction)
+		loss -= (1 - true_label) * math.log(1 - prediction)
+	return loss / len(X)
+
 def train_all_houses(X, y, training_config) :
 	model = {
 		"houses": HOUSES,
 		"weights": {},
-		"biases": {}
+		"biases": {},
+		"loss_history": {}
 	}
 
 	for house in HOUSES :
-		weights, bias = train_one_house(X, y, house, training_config)
+		weights, bias, loss_history = train_one_house(X, y, house, training_config)
 		model["weights"][house] = weights
 		model["biases"][house] = bias
+		model["loss_history"][house] = loss_history
 	return model
+
+def average_loss_history(loss_history) :
+	epoch_count = min(len(loss_history[house]) for house in HOUSES)
+	average = []
+	for epoch in range(epoch_count) :
+		total = 0.0
+		for house in HOUSES :
+			total += loss_history[house][epoch]
+		average.append(total / len(HOUSES))
+	return average
+
+def train_optimizer_comparison(X, y, learning_rate, epochs) :
+	strategy_configs = {
+		"batch": {
+			"learning_rate": learning_rate,
+			"epochs": epochs,
+			"batch_size": None,
+		},
+		"stochastic": {
+			"learning_rate": learning_rate,
+			"epochs": epochs,
+			"batch_size": 1,
+		},
+		"mini_batch": {
+			"learning_rate": learning_rate,
+			"epochs": epochs,
+			"batch_size": 32,
+		},
+	}
+	models = {}
+	histories = {}
+	for strategy, config in strategy_configs.items() :
+		models[strategy] = train_all_houses(X, y, config)
+		histories[strategy] = average_loss_history(models[strategy]["loss_history"])
+	return models, histories, strategy_configs
 
 def train_one_house(X, y, target_house, training_config):
 	learning_rate = training_config["learning_rate"]
@@ -65,7 +120,7 @@ def train_one_house(X, y, target_house, training_config):
 
 	if batch_size is None :
 		batch_size = len(X)
-
+		
 	if epochs <= 0 :
 		raise ValueError("epochs must be greater than 0")
 	if learning_rate <= 0 :
@@ -73,16 +128,23 @@ def train_one_house(X, y, target_house, training_config):
 	if batch_size not in batch :
 		raise ValueError("batch_size must be 1, 32, or the full training size")
 
+
 	y_binary = one_vs_all_labels(target_house, y)
 	weights, bias = initialize_model(X)
+	loss_history = []
 
 	for epoch in range(epochs) :
+		indexes = list(range(len(X)))
+		if batch_size < len(X) :
+			random.Random(epoch).shuffle(indexes)
 		for start in range(0, len(X), batch_size) :
 			end = start + batch_size
-			batch_X = X[start:end]
-			batch_y = y_binary[start:end]
+			batch_indexes = indexes[start:end]
+			batch_X = [X[index] for index in batch_indexes]
+			batch_y = [y_binary[index] for index in batch_indexes]
 			weights, bias = gradient_descent(batch_X, batch_y, weights, bias, learning_rate)
-	return weights, bias
+		loss_history.append(binary_cross_entropy(X, y_binary, weights, bias))
+	return weights, bias, loss_history
 
 
 def sigmoid(z):
@@ -218,15 +280,38 @@ def main() :
 	}
 
 	try:
+
 		X, y, preprocessing_params = prepare_training_data(args.dataset)
-		model = train_all_houses(X, y, training_config)
+		comparison_models, optimizer_histories, optimizer_configs = train_optimizer_comparison(
+			X, y, args.learning_rate, args.epochs
+		)
+		if args.batch_size is None :
+			model = comparison_models["batch"]
+		elif args.batch_size == 1 :
+			model = comparison_models["stochastic"]
+		elif args.batch_size == 32 :
+			model = comparison_models["mini_batch"]
+		else :
+			model = train_all_houses(X, y, training_config)
+		model["optimizer_loss_history"] = optimizer_histories
+		model["optimizer_house_loss_history"] = {
+			strategy: comparison_models[strategy]["loss_history"]
+			for strategy in comparison_models
+		}
+		model["optimizer_models"] = {
+			strategy: {
+				"weights": comparison_models[strategy]["weights"],
+				"biases": comparison_models[strategy]["biases"],
+			}
+			for strategy in comparison_models
+		}
+		model["optimizer_configs"] = optimizer_configs
 		model["preprocessing_params"] = preprocessing_params
 		model["training_config"] = training_config
 		save_model(model)
 	except (FileNotFoundError, ValueError, KeyError) as error:
 		print(f"error: {error}")
 		return 1
-
 	print(f"loaded {len(X)} students")
 	print(f"features: {len(preprocessing_params['features'])}")
 	print(f"learning_rate: {args.learning_rate}")
