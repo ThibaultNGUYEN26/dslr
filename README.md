@@ -66,7 +66,7 @@ The standard deviation measures how spread out the values are around the mean.
 Formula:
 
 ```text
-std = sqrt(sum((value - mean)^2) / count)
+std = sqrt(sum((value - mean)^2) / (count - 1))
 ```
 
 ##### Minimum
@@ -135,10 +135,13 @@ By default, the program examines every numerical course and selects the most hom
 
 Strongly overlapping distributions indicate that the course does not distinguish the houses very well. Clearly separated distributions indicate that the course may be useful for classification.
 
+**Answer:** Care of Magical Creatures has the most homogeneous score distribution across all four houses.
+
 ```bash
 make histogram
 make histogram COURSE="Astronomy"
 make histogram-save OUT=histogram.png
+python histogram.py datasets/dataset_train.csv
 ```
 
 ### Scatter Plot
@@ -149,10 +152,13 @@ By default, the program tests every pair of numerical features and selects the p
 
 This plot helps identify redundant features and reveals whether combinations of courses form visible house clusters.
 
+**Answer:** Astronomy and Defense Against the Dark Arts are the two most similar features. Their Pearson correlation is `-1`, so they contain the same information in opposite directions.
+
 ```bash
 make scatter
 make scatter X="Astronomy" Y="Herbology"
 make scatter-save X="Astronomy" Y="Herbology" OUT=scatter_plot.png
+python scatter_plot.py datasets/dataset_train.csv
 ```
 
 ### Pair Plot
@@ -164,10 +170,26 @@ The pair plot provides a matrix view of several numerical features:
 
 Looking at all these relationships together makes it easier to find useful classification features, house separation, correlations, outliers, and redundant courses. The default view uses the features selected for logistic regression; `pair-all` includes every numerical feature and therefore produces a much larger matrix.
 
+**Answer:** The ten features selected for logistic regression are:
+
+* Astronomy
+* Herbology
+* Divination
+* Muggle Studies
+* Ancient Runes
+* History of Magic
+* Transfiguration
+* Potions
+* Charms
+* Flying
+
+Care of Magical Creatures is excluded because its distributions are homogeneous between the houses. Defense Against the Dark Arts is excluded because it is redundant with Astronomy. Arithmancy does not provide useful house separation, and Index is only a row identifier.
+
 ```bash
 make pair
 make pair-all
 make pair-save OUT=pair_plot.png
+python pair_plot.py datasets/dataset_train.csv
 ```
 
 ## Logistic Regression
@@ -187,7 +209,7 @@ For every student, the model calculates a decision score from the ten standardiz
 
 ```bash
 make train
-python -m src.logistic_regression.logreg_train datasets/dataset_train.csv
+python logreg_train.py datasets/dataset_train.csv
 ```
 
 The model uses Batch gradient descent, which updates the weights and bias once per epoch using the complete training dataset. The trained weights, biases, and preprocessing parameters are saved in `models/weights.json`.
@@ -198,7 +220,7 @@ The prediction program loads `models/weights.json` and applies the same feature 
 
 ```bash
 make predict
-python -m src.logistic_regression.logreg_predict datasets/dataset_test.csv models/weights.json --output houses.csv
+python logreg_predict.py datasets/dataset_test.csv models/weights.json --output houses.csv
 ```
 
 The generated `houses.csv` file contains each student index and predicted Hogwarts house.
@@ -218,7 +240,7 @@ The number of dataset rows that do not contain a valid numerical value for the f
 The average squared distance between the values and their mean. It measures dispersion before the square root used for standard deviation is applied.
 
 ```text
-variance = sum((value - mean)^2) / count
+variance = sum((value - mean)^2) / (count - 1)
 ```
 
 #### Range
@@ -249,7 +271,7 @@ This produces many updates during each epoch and can improve the model quickly, 
 
 ```bash
 make train-stochastic
-python -m src.logistic_regression.logreg_train datasets/dataset_train.csv --epochs 1600 --batch-size 1
+python logreg_train.py datasets/dataset_train.csv --epochs 1600 --batch-size 1
 ```
 
 ### Bonus 3: Mini-batch Gradient Descent
@@ -260,7 +282,7 @@ It provides a compromise between Batch and Stochastic training: updates occur mo
 
 ```bash
 make train-minibatch
-python -m src.logistic_regression.logreg_train datasets/dataset_train.csv --epochs 1600 --batch-size 32
+python logreg_train.py datasets/dataset_train.csv --epochs 1600 --batch-size 32
 ```
 
 ### Bonus 4: Website
