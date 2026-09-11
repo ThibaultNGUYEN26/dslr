@@ -18,7 +18,7 @@ PREDICT_MODULE := src.logistic_regression.logreg_predict
 WEB_FRONTEND := web/frontend
 WEB_BACKEND := web/backend/server.py
 
-.PHONY: help describe describe-test histogram histogram-save scatter scatter-save pair pair-all pair-save train train-batch train-minibatch train-stochastic predict install-web api web build-web clean
+.PHONY: help describe describe-test histogram histogram-save scatter scatter-save pair pair-all pair-save train train-minibatch train-stochastic predict install-web api web build-web clean
 
 help:
 	@printf "Available targets:\n"
@@ -34,7 +34,6 @@ help:
 	@printf "  make pair-all                 Show pair plot for all numeric features\n"
 	@printf "  make pair-save                Save pair plot to OUT=pair_plot.png\n"
 	@printf "  make train                    Train all optimizers; use Batch for predictions\n"
-	@printf "  make train-batch              Train all optimizers; use Batch for predictions\n"
 	@printf "  make train-minibatch          Train all optimizers; use Mini-batch for predictions\n"
 	@printf "  make train-stochastic         Train all optimizers; use Stochastic for predictions\n"
 	@printf "  make predict                  Generate houses.csv from TEST_DATASET\n"
@@ -88,9 +87,6 @@ pair-save:
 	$(PYTHON) $(PAIR) $(DATASET) --no-show --save $(or $(OUT),pair_plot.png)
 
 train:
-	$(PYTHON) -m $(TRAIN_MODULE) $(DATASET) --epochs 1600
-
-train-batch:
 	$(PYTHON) -m $(TRAIN_MODULE) $(DATASET) --epochs 1600
 
 train-minibatch:
