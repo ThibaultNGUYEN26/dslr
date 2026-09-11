@@ -196,6 +196,9 @@ def get_feature_pair(csv_path, feature_x, feature_y):
 
 
 def display_scatter_plot(pairs, feature_x, feature_y, correlation=None, output_path=None, show=True):
+    if not show:
+        plt.switch_backend("Agg")
+
     plt.figure(figsize=(10, 7))
 
     houses = sorted({house for _, _, house in pairs if house})

@@ -241,6 +241,9 @@ def get_feature_distribution(csv_path, feature):
 
 
 def display_histogram(grouped_values, feature, bins=20, output_path=None, show=True):
+    if not show:
+        plt.switch_backend("Agg")
+
     plt.figure(figsize=(11, 7))
     minimum, maximum = values_range(grouped_values)
     if maximum == minimum:
