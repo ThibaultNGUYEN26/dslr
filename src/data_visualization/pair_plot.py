@@ -243,6 +243,9 @@ def prepare_pair_plot(csv_path, requested_features=None, use_all=False):
 
 
 def display_pair_plot(rows, houses, features, data, output_path=None, show=True):
+    if not show:
+        plt.switch_backend("Agg")
+
     size = len(features)
     figure_width = max(10, size * 1.7)
     figure_height = max(10, size * 1.7)
