@@ -116,11 +116,18 @@ def train_one_house(X, y, target_house, training_config):
 	learning_rate = training_config["learning_rate"]
 	epochs = training_config["epochs"]
 	batch_size = training_config["batch_size"]
+	batch = [1, 32, len(X)]
 
 	if batch_size is None :
 		batch_size = len(X)
-	if batch_size <= 0 :
-		raise ValueError("batch size must be greater than zero")
+		
+	if epochs <= 0 :
+		raise ValueError("epochs must be greater than 0")
+	if learning_rate <= 0 :
+		raise ValueError("learning_rate must be greater than 0")
+	if batch_size not in batch :
+		raise ValueError("batch_size must be 1, 32, or the full training size")
+
 
 	y_binary = one_vs_all_labels(target_house, y)
 	weights, bias = initialize_model(X)
@@ -272,40 +279,45 @@ def main() :
 		"batch_size" : args.batch_size,
 	}
 
-	X, y, preprocessing_params = prepare_training_data(args.dataset)
-	comparison_models, optimizer_histories, optimizer_configs = train_optimizer_comparison(
-		X, y, args.learning_rate, args.epochs
-	)
-	if args.batch_size is None :
-		model = comparison_models["batch"]
-	elif args.batch_size == 1 :
-		model = comparison_models["stochastic"]
-	elif args.batch_size == 32 :
-		model = comparison_models["mini_batch"]
-	else :
-		model = train_all_houses(X, y, training_config)
-	model["optimizer_loss_history"] = optimizer_histories
-	model["optimizer_house_loss_history"] = {
-		strategy: comparison_models[strategy]["loss_history"]
-		for strategy in comparison_models
-	}
-	model["optimizer_models"] = {
-		strategy: {
-			"weights": comparison_models[strategy]["weights"],
-			"biases": comparison_models[strategy]["biases"],
-		}
-		for strategy in comparison_models
-	}
-	model["optimizer_configs"] = optimizer_configs
-	model["preprocessing_params"] = preprocessing_params
-	model["training_config"] = training_config
-	save_model(model)
+	try:
 
+		X, y, preprocessing_params = prepare_training_data(args.dataset)
+		comparison_models, optimizer_histories, optimizer_configs = train_optimizer_comparison(
+			X, y, args.learning_rate, args.epochs
+		)
+		if args.batch_size is None :
+			model = comparison_models["batch"]
+		elif args.batch_size == 1 :
+			model = comparison_models["stochastic"]
+		elif args.batch_size == 32 :
+			model = comparison_models["mini_batch"]
+		else :
+			model = train_all_houses(X, y, training_config)
+		model["optimizer_loss_history"] = optimizer_histories
+		model["optimizer_house_loss_history"] = {
+			strategy: comparison_models[strategy]["loss_history"]
+			for strategy in comparison_models
+		}
+		model["optimizer_models"] = {
+			strategy: {
+				"weights": comparison_models[strategy]["weights"],
+				"biases": comparison_models[strategy]["biases"],
+			}
+			for strategy in comparison_models
+		}
+		model["optimizer_configs"] = optimizer_configs
+		model["preprocessing_params"] = preprocessing_params
+		model["training_config"] = training_config
+		save_model(model)
+	except (FileNotFoundError, ValueError, KeyError) as error:
+		print(f"error: {error}")
+		return 1
 	print(f"loaded {len(X)} students")
 	print(f"features: {len(preprocessing_params['features'])}")
 	print(f"learning_rate: {args.learning_rate}")
 	print(f"epochs: {args.epochs}")
 	print(f"batch_size: {args.batch_size or len(X)}")
+	return 0
 
 if __name__ == "__main__" :
-	main()
+	raise SystemExit(main())

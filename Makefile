@@ -18,7 +18,7 @@ PREDICT_MODULE := src.logistic_regression.logreg_predict
 WEB_FRONTEND := web/frontend
 WEB_BACKEND := web/backend/server.py
 
-.PHONY: help describe describe-test histogram histogram-save scatter scatter-save pair pair-all pair-save train predict install-web api web build-web clean
+.PHONY: help describe describe-test histogram histogram-save scatter scatter-save pair pair-all pair-save train train-minibatch train-stochastic predict install-web api web build-web clean
 
 help:
 	@printf "Available targets:\n"
@@ -33,7 +33,9 @@ help:
 	@printf "  make pair                     Show selected pair plot\n"
 	@printf "  make pair-all                 Show pair plot for all numeric features\n"
 	@printf "  make pair-save                Save pair plot to OUT=pair_plot.png\n"
-	@printf "  make train                    Train all optimizers and refresh model histories\n"
+	@printf "  make train                    Train all optimizers; use Batch for predictions\n"
+	@printf "  make train-minibatch          Train all optimizers; use Mini-batch for predictions\n"
+	@printf "  make train-stochastic         Train all optimizers; use Stochastic for predictions\n"
 	@printf "  make predict                  Generate houses.csv from TEST_DATASET\n"
 	@printf "  make install-web              Install React frontend dependencies\n"
 	@printf "  make api                      Start Flask API on http://127.0.0.1:5000\n"
@@ -85,7 +87,13 @@ pair-save:
 	$(PYTHON) $(PAIR) $(DATASET) --no-show --save $(or $(OUT),pair_plot.png)
 
 train:
-	$(PYTHON) -m $(TRAIN_MODULE) $(DATASET)
+	$(PYTHON) -m $(TRAIN_MODULE) $(DATASET) --epochs 1600
+
+train-minibatch:
+	$(PYTHON) -m $(TRAIN_MODULE) $(DATASET) --epochs 1600 --batch-size 32
+
+train-stochastic:
+	$(PYTHON) -m $(TRAIN_MODULE) $(DATASET) --epochs 1600 --batch-size 1
 
 predict:
 	$(PYTHON) -m $(PREDICT_MODULE) $(TEST_DATASET) models/weights.json --output houses.csv

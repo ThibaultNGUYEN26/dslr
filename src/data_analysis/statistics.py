@@ -24,14 +24,14 @@ def ft_mean(values):
 
 def ft_variance(values):
     count = ft_count(values)
-    if count == 0:
+    if count < 2:
         return None
 
     mean = ft_mean(values)
     variance = 0.0
     for value in values:
         variance += (value - mean) ** 2
-    return variance / count
+    return variance / (count - 1)
 
 
 def ft_std(values):
