@@ -74,6 +74,23 @@ h2 {
   width: 40px;
 }
 
+.refresh-button {
+  gap: 8px;
+  padding: 0 14px;
+  white-space: nowrap;
+  width: auto;
+}
+
+.spinning {
+  animation: spin 800ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .view-tabs {
   display: flex;
   gap: 8px;
@@ -328,6 +345,146 @@ tbody tr:nth-child(even) {
   background: #fbf8f2;
 }
 
+.loss-grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0 auto;
+  max-width: 1440px;
+}
+
+.loss-panel {
+  background: #fffdfa;
+  border: 1px solid #d9d4c7;
+  border-radius: 8px;
+  padding: 18px;
+}
+
+.loss-card {
+  color: inherit;
+  cursor: zoom-in;
+  font: inherit;
+  text-align: initial;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+  width: 100%;
+}
+
+.loss-card:hover,
+.loss-card:focus-visible {
+  border-color: #25313a;
+  box-shadow: 0 10px 24px rgba(24, 32, 38, 0.14);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.loss-title {
+  margin-bottom: 14px;
+  text-align: center;
+}
+
+.loss-legend {
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.86rem;
+  font-weight: 800;
+  gap: 18px;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.loss-legend span {
+  align-items: center;
+  display: inline-flex;
+  gap: 7px;
+}
+
+.loss-legend i {
+  border-radius: 50%;
+  display: inline-block;
+  height: 10px;
+  width: 10px;
+}
+
+.loss-legend .observed-dot {
+  background: #6e6253;
+}
+
+.loss-chart-scroll {
+  overflow-x: auto;
+}
+
+.loss-chart {
+  display: block;
+  min-width: 520px;
+  width: 100%;
+}
+
+.chart-grid-line {
+  stroke: #e5dfd4;
+  stroke-width: 1;
+}
+
+.chart-axis {
+  stroke: #6e6253;
+  stroke-width: 1.5;
+}
+
+.chart-tick,
+.chart-label {
+  fill: #3d494f;
+  font-family: inherit;
+}
+
+.chart-tick {
+  font-size: 12px;
+}
+
+.chart-label {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.loss-line {
+  fill: none;
+  opacity: 0.78;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.loss-line.average {
+  opacity: 1;
+  stroke-width: 3.5;
+}
+
+.regression-point {
+  fill: #6e6253;
+  opacity: 0.16;
+}
+
+.regression-line {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+}
+
+
+.describe-table th:first-child {
+  left: 0;
+  position: sticky;
+  z-index: 2;
+}
+
+.describe-table tbody th {
+  background: #f4f1ea;
+  color: #3d494f;
+  text-align: left;
+}
+
 .modal-backdrop {
   align-items: center;
   background: rgba(24, 32, 38, 0.72);
@@ -382,6 +539,20 @@ tbody tr:nth-child(even) {
   object-fit: contain;
 }
 
+.loss-modal {
+  max-width: 1400px;
+  width: min(100%, 1400px);
+}
+
+.loss-modal .loss-panel {
+  border: 0;
+  padding: 0;
+}
+
+.loss-modal .loss-chart {
+  min-width: 960px;
+}
+
 @media (max-width: 760px) {
   .app-shell {
     padding: 16px;
@@ -390,6 +561,10 @@ tbody tr:nth-child(even) {
   .toolbar {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .loss-grid {
+    grid-template-columns: 1fr;
   }
 
   input {

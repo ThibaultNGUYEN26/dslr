@@ -22,7 +22,7 @@ def ft_mean(values):
     return ft_sum(values) / count
 
 
-def ft_std(values):
+def ft_variance(values):
     count = ft_count(values)
     if count == 0:
         return None
@@ -31,7 +31,14 @@ def ft_std(values):
     variance = 0.0
     for value in values:
         variance += (value - mean) ** 2
-    return sqrt(variance / count)
+    return variance / count
+
+
+def ft_std(values):
+    variance = ft_variance(values)
+    if variance is None:
+        return None
+    return sqrt(variance)
 
 
 def ft_min(values):
@@ -70,14 +77,31 @@ def ft_percentile(values, percentile):
     return lower_value + (upper_value - lower_value) * fraction
 
 
-def describe_values(values):
+def describe_values(values, total_count=None):
+    count = ft_count(values)
+    if total_count is None:
+        total_count = count
+
+    minimum = ft_min(values)
+    percentile_25 = ft_percentile(values, 25)
+    percentile_75 = ft_percentile(values, 75)
+    maximum = ft_max(values)
+
     return {
-        "Count": float(ft_count(values)),
+        "Count": float(count),
+        "Missing": float(total_count - count),
         "Mean": ft_mean(values),
         "Std": ft_std(values),
-        "Min": ft_min(values),
-        "25%": ft_percentile(values, 25),
+        "Variance": ft_variance(values),
+        "Min": minimum,
+        "25%": percentile_25,
         "50%": ft_percentile(values, 50),
-        "75%": ft_percentile(values, 75),
-        "Max": ft_max(values),
+        "75%": percentile_75,
+        "Max": maximum,
+        "Range": maximum - minimum if minimum is not None else None,
+        "IQR": (
+            percentile_75 - percentile_25
+            if percentile_25 is not None and percentile_75 is not None
+            else None
+        ),
     }

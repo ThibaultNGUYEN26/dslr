@@ -47,6 +47,10 @@ The program computes the following values for each numerical column:
 
 The number of valid numerical values in the feature.
 
+### Missing
+
+The number of rows that do not contain a valid numerical value for the feature.
+
 ### Mean
 
 The average value of the feature.
@@ -67,6 +71,10 @@ Formula:
 std = sqrt(sum((value - mean)^2) / count)
 ```
 
+### Variance
+
+The average squared distance from the mean. The standard deviation is the square root of this value.
+
 ### Minimum
 
 The smallest value of the feature.
@@ -84,6 +92,14 @@ The 50% percentile is also known as the median.
 ### Maximum
 
 The largest value of the feature.
+
+### Range
+
+The distance between the maximum and minimum values.
+
+### Interquartile Range
+
+The distance between the 75th and 25th percentiles. This measures the spread of the middle half of the data.
 
 ## Constraints
 

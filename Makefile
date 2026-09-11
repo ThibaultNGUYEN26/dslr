@@ -1,15 +1,24 @@
+UNAME_S := $(shell uname -s)
+
+ifeq ($(UNAME_S),Darwin)
 PYTHON := python3
+else
+PYTHON := python
+endif
+
 DATASET := datasets/dataset_train.csv
 TEST_DATASET := datasets/dataset_test.csv
 
 HISTOGRAM := src/data_visualization/histogram.py
 SCATTER := src/data_visualization/scatter_plot.py
 PAIR := src/data_visualization/pair_plot.py
+TRAIN_MODULE := src.logistic_regression.logreg_train
+PREDICT_MODULE := src.logistic_regression.logreg_predict
 
 WEB_FRONTEND := web/frontend
 WEB_BACKEND := web/backend/server.py
 
-.PHONY: help describe describe-test histogram histogram-save scatter scatter-save pair pair-all pair-save install-web api web build-web clean
+.PHONY: help describe describe-test histogram histogram-save scatter scatter-save pair pair-all pair-save train predict install-web api web build-web clean
 
 help:
 	@printf "Available targets:\n"
@@ -24,6 +33,8 @@ help:
 	@printf "  make pair                     Show selected pair plot\n"
 	@printf "  make pair-all                 Show pair plot for all numeric features\n"
 	@printf "  make pair-save                Save pair plot to OUT=pair_plot.png\n"
+	@printf "  make train                    Train all optimizers and refresh model histories\n"
+	@printf "  make predict                  Generate houses.csv from TEST_DATASET\n"
 	@printf "  make install-web              Install React frontend dependencies\n"
 	@printf "  make api                      Start Flask API on http://127.0.0.1:5000\n"
 	@printf "  make web                      Start React app on http://127.0.0.1:5173\n"
@@ -73,17 +84,23 @@ pair-all:
 pair-save:
 	$(PYTHON) $(PAIR) $(DATASET) --no-show --save $(or $(OUT),pair_plot.png)
 
+train:
+	$(PYTHON) -m $(TRAIN_MODULE) $(DATASET)
+
+predict:
+	$(PYTHON) -m $(PREDICT_MODULE) $(TEST_DATASET) models/weights.json --output houses.csv
+
 install-web:
-	npm install --prefix $(WEB_FRONTEND)
+	cd $(WEB_FRONTEND) && npm install
 
 api:
 	$(PYTHON) $(WEB_BACKEND)
 
 web:
-	npm run dev --prefix $(WEB_FRONTEND)
+	cd $(WEB_FRONTEND) && npm run dev
 
 build-web:
-	npm run build --prefix $(WEB_FRONTEND)
+	cd $(WEB_FRONTEND) && npm run build
 
 clean:
 	find . -name '__pycache__' -type d -prune -exec rm -r {} +
