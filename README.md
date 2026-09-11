@@ -205,7 +205,7 @@ The generated `houses.csv` file contains each student index and predicted Hogwar
 
 ## Bonus
 
-### Enhanced Describe
+### Bonus 1: Enhanced Describe
 
 In addition to the mandatory statistics, `describe.py` computes four supplementary fields for every numerical feature.
 
@@ -236,3 +236,82 @@ The distance between the 75th and 25th percentiles. It measures the spread of th
 ```text
 IQR = 75% - 25%
 ```
+
+### Bonus 2: Stochastic Gradient Descent
+
+In addition to mandatory Batch gradient descent, the trainer supports Stochastic gradient descent. The dataset is shuffled deterministically at the beginning of each epoch, making repeated training runs reproducible.
+
+The model file stores the weights and loss history produced by this strategy, allowing its convergence and predictions to be compared with Batch training.
+
+Stochastic gradient descent uses a batch size of `1`. The weights and bias are updated after every student instead of once after the complete dataset.
+
+This produces many updates during each epoch and can improve the model quickly, but its loss curve may be noisier because every update is based on only one training example.
+
+```bash
+make train-stochastic
+python -m src.logistic_regression.logreg_train datasets/dataset_train.csv --epochs 1600 --batch-size 1
+```
+
+### Bonus 3: Mini-batch Gradient Descent
+
+Mini-batch gradient descent divides the shuffled dataset into groups of `32` students. The weights and bias are updated after each group.
+
+It provides a compromise between Batch and Stochastic training: updates occur more frequently than with the complete dataset, while each update is more stable than one based on a single student.
+
+```bash
+make train-minibatch
+python -m src.logistic_regression.logreg_train datasets/dataset_train.csv --epochs 1600 --batch-size 32
+```
+
+### Bonus 4: Website
+
+The project includes a web interface built with a Flask API and a React frontend powered by Vite. It brings the command-line analysis tools together in one place and provides pages for:
+
+* Browsing and searching the training and test datasets
+* Viewing the descriptive statistics
+* Exploring histograms
+* Comparing features with scatter plots
+* Inspecting the pair plot
+* Viewing training loss and logistic regression curves
+
+Install the Python and frontend dependencies before starting the website:
+
+```bash
+pip install -r requirements.txt
+make install-web
+```
+
+Run the API and frontend in two separate terminals:
+
+```bash
+make api
+```
+
+```bash
+make web
+```
+
+The Flask API runs at `http://127.0.0.1:5000`, and the website is available at `http://127.0.0.1:5173`.
+
+### Bonus 5: Loss and Regression Curves
+
+The website provides interactive graphs based on the data saved by the latest training run. Every graph can be clicked to open a larger view.
+
+#### Loss Curves
+
+The loss graphs display binary cross-entropy over the training epochs. Four graphs are available:
+
+* One comparison containing the Batch, Stochastic, and Mini-batch average losses
+* One graph dedicated to Batch training
+* One graph dedicated to Stochastic training
+* One graph dedicated to Mini-batch training
+
+The individual graphs contain an average curve and one curve for each Hogwarts house. They show how quickly each strategy learns and whether its loss stabilizes.
+
+#### Regression Curves
+
+The regression graphs show the observed binary labels at `0` and `1` together with the probability curve produced by the logistic regression model. The selected house is treated as `1`, while every other house is treated as `0`.
+
+The probability is calculated from the decision score using all ten model features. As with the loss view, the page contains an optimizer comparison and one individual graph for each of the three training strategies. A house selector can be used to inspect Gryffindor, Hufflepuff, Ravenclaw, or Slytherin.
+
+After running another training command, the **Refresh training data** button reloads `models/weights.json` so the graphs represent the latest trained models and loss histories.
