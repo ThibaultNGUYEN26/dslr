@@ -61,9 +61,17 @@ def train_one_house(X, y, target_house, training_config):
 	learning_rate = training_config["learning_rate"]
 	epochs = training_config["epochs"]
 	batch_size = training_config["batch_size"]
+	batch = [1, 32, len(X)]
 
 	if batch_size is None :
 		batch_size = len(X)
+
+	if epochs <= 0 :
+		raise ValueError("epochs must be greater than 0")
+	if learning_rate <= 0 :
+		raise ValueError("learning_rate must be greater than 0")
+	if batch_size not in batch :
+		raise ValueError("batch_size must be 1, 32, or the full training size")
 
 	y_binary = one_vs_all_labels(target_house, y)
 	weights, bias = initialize_model(X)
@@ -209,17 +217,22 @@ def main() :
 		"batch_size" : args.batch_size,
 	}
 
-	X, y, preprocessing_params = prepare_training_data(args.dataset)
-	model = train_all_houses(X, y, training_config)
-	model["preprocessing_params"] = preprocessing_params
-	model["training_config"] = training_config
-	save_model(model)
+	try:
+		X, y, preprocessing_params = prepare_training_data(args.dataset)
+		model = train_all_houses(X, y, training_config)
+		model["preprocessing_params"] = preprocessing_params
+		model["training_config"] = training_config
+		save_model(model)
+	except (FileNotFoundError, ValueError, KeyError) as error:
+		print(f"error: {error}")
+		return 1
 
 	print(f"loaded {len(X)} students")
 	print(f"features: {len(preprocessing_params['features'])}")
 	print(f"learning_rate: {args.learning_rate}")
 	print(f"epochs: {args.epochs}")
 	print(f"batch_size: {args.batch_size or len(X)}")
+	return 0
 
 if __name__ == "__main__" :
-	main()
+	raise SystemExit(main())
