@@ -10,6 +10,7 @@ HOUSES = ["Gryffindor", "Hufflepuff", "Ravenclaw", "Slytherin"]
 
 def save_model(model) :
 	output_path = Path("models/weights.json")
+	output_path.parent.mkdir(parents=True, exist_ok=True)
 	temporary_path = output_path.with_suffix(".json.tmp")
 	with temporary_path.open("w") as file :
 		json.dump(model, file, indent=2)
