@@ -268,6 +268,7 @@ def parse_arguments() :
 	parser.add_argument("--learning-rate", type=float, default=0.01, help="learning rate, default: 0.01")
 	parser.add_argument("--epochs", type=int, default=1000, help="number of training epochs, default: 1000")
 	parser.add_argument("--batch-size", type=int, default=None, help="mini-batch size; default uses the full dataset")
+	parser.add_argument("--compare-optimizers", action="store_true", help="also train batch, stochastic, and mini-batch models for comparison")
 	return parser.parse_args()
 
 def main() :
@@ -282,30 +283,30 @@ def main() :
 	try:
 
 		X, y, preprocessing_params = prepare_training_data(args.dataset)
-		comparison_models, optimizer_histories, optimizer_configs = train_optimizer_comparison(
-			X, y, args.learning_rate, args.epochs
-		)
-		if args.batch_size is None :
-			model = comparison_models["batch"]
-		elif args.batch_size == 1 :
-			model = comparison_models["stochastic"]
-		elif args.batch_size == 32 :
-			model = comparison_models["mini_batch"]
-		else :
-			model = train_all_houses(X, y, training_config)
-		model["optimizer_loss_history"] = optimizer_histories
-		model["optimizer_house_loss_history"] = {
-			strategy: comparison_models[strategy]["loss_history"]
-			for strategy in comparison_models
-		}
-		model["optimizer_models"] = {
-			strategy: {
-				"weights": comparison_models[strategy]["weights"],
-				"biases": comparison_models[strategy]["biases"],
+		model = train_all_houses(X, y, training_config)
+		if args.compare_optimizers :
+			comparison_models, optimizer_histories, optimizer_configs = train_optimizer_comparison(
+				X, y, args.learning_rate, args.epochs
+			)
+			if args.batch_size is None :
+				model = comparison_models["batch"]
+			elif args.batch_size == 1 :
+				model = comparison_models["stochastic"]
+			elif args.batch_size == 32 :
+				model = comparison_models["mini_batch"]
+			model["optimizer_loss_history"] = optimizer_histories
+			model["optimizer_house_loss_history"] = {
+				strategy: comparison_models[strategy]["loss_history"]
+				for strategy in comparison_models
 			}
-			for strategy in comparison_models
-		}
-		model["optimizer_configs"] = optimizer_configs
+			model["optimizer_models"] = {
+				strategy: {
+					"weights": comparison_models[strategy]["weights"],
+					"biases": comparison_models[strategy]["biases"],
+				}
+				for strategy in comparison_models
+			}
+			model["optimizer_configs"] = optimizer_configs
 		model["preprocessing_params"] = preprocessing_params
 		model["training_config"] = training_config
 		save_model(model)

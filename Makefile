@@ -1,10 +1,4 @@
-UNAME_S := $(shell uname -s)
-
-ifeq ($(UNAME_S),Darwin)
 PYTHON := python3
-else
-PYTHON := python
-endif
 
 DATASET := datasets/dataset_train.csv
 TEST_DATASET := datasets/dataset_test.csv
@@ -18,11 +12,12 @@ PREDICT_MODULE := src.logistic_regression.logreg_predict
 WEB_FRONTEND := web/frontend
 WEB_BACKEND := web/backend/server.py
 
-.PHONY: help describe describe-test histogram histogram-save scatter scatter-save pair pair-all pair-save train train-minibatch train-stochastic predict install-web api web build-web clean
+.PHONY: help describe describe-bonus describe-test histogram histogram-save scatter scatter-save pair pair-all pair-save train train-stochastic train-mini-batch train-all predict install-web api web build-web clean
 
 help:
 	@printf "Available targets:\n"
-	@printf "  make describe                 Run data analysis on DATASET\n"
+	@printf "  make describe                 Run mandatory data analysis on DATASET\n"
+	@printf "  make describe-bonus           Run data analysis with bonus statistics on DATASET\n"
 	@printf "  make describe-test            Run data analysis on TEST_DATASET\n"
 	@printf "  make histogram                Show auto-selected homogeneous course histogram\n"
 	@printf "  make histogram COURSE=Potions Show one course histogram\n"
@@ -33,9 +28,10 @@ help:
 	@printf "  make pair                     Show selected pair plot\n"
 	@printf "  make pair-all                 Show pair plot for all numeric features\n"
 	@printf "  make pair-save                Save pair plot to OUT=pair_plot.png\n"
-	@printf "  make train                    Train all optimizers; use Batch for predictions\n"
-	@printf "  make train-minibatch          Train all optimizers; use Mini-batch for predictions\n"
-	@printf "  make train-stochastic         Train all optimizers; use Stochastic for predictions\n"
+	@printf "  make train                    Train Batch optimizer only\n"
+	@printf "  make train-stochastic         Train Stochastic optimizer only\n"
+	@printf "  make train-mini-batch         Train Mini-batch optimizer only\n"
+	@printf "  make train-all                Train Batch, Stochastic, and Mini-batch optimizers\n"
 	@printf "  make predict                  Generate houses.csv from TEST_DATASET\n"
 	@printf "  make install-web              Install React frontend dependencies\n"
 	@printf "  make api                      Start Flask API on http://127.0.0.1:5000\n"
@@ -45,6 +41,9 @@ help:
 
 describe:
 	$(PYTHON) describe.py $(DATASET)
+
+describe-bonus:
+	$(PYTHON) describe.py $(DATASET) --bonus
 
 describe-test:
 	$(PYTHON) describe.py $(TEST_DATASET)
@@ -87,13 +86,16 @@ pair-save:
 	$(PYTHON) $(PAIR) $(DATASET) --no-show --save $(or $(OUT),pair_plot.png)
 
 train:
-	$(PYTHON) -m $(TRAIN_MODULE) $(DATASET) --epochs 1600
-
-train-minibatch:
-	$(PYTHON) -m $(TRAIN_MODULE) $(DATASET) --epochs 1600 --batch-size 32
+	$(PYTHON) -m $(TRAIN_MODULE) $(DATASET)
 
 train-stochastic:
 	$(PYTHON) -m $(TRAIN_MODULE) $(DATASET) --epochs 1600 --batch-size 1
+
+train-mini-batch:
+	$(PYTHON) -m $(TRAIN_MODULE) $(DATASET) --epochs 1600 --batch-size 32
+
+train-all:
+	$(PYTHON) -m $(TRAIN_MODULE) $(DATASET) --compare-optimizers
 
 predict:
 	$(PYTHON) -m $(PREDICT_MODULE) $(TEST_DATASET) models/weights.json --output houses.csv

@@ -5,7 +5,18 @@ from pathlib import Path
 from src.data_analysis.statistics import describe_values
 
 
-STAT_NAMES = (
+MANDATORY_STAT_NAMES = (
+    "Count",
+    "Mean",
+    "Std",
+    "Min",
+    "25%",
+    "50%",
+    "75%",
+    "Max",
+)
+
+BONUS_STAT_NAMES = (
     "Count",
     "Missing",
     "Mean",
@@ -19,6 +30,8 @@ STAT_NAMES = (
     "Range",
     "IQR",
 )
+
+STAT_NAMES = MANDATORY_STAT_NAMES
 
 
 class DescribeError(Exception):
@@ -94,13 +107,13 @@ def format_value(value):
     return f"{value:.6f}"
 
 
-def format_describe_table(table):
+def format_describe_table(table, stat_names=STAT_NAMES):
     column_names = list(table.keys())
     column_widths = {}
 
     for column_name in column_names:
         width = len(column_name)
-        for stat_name in STAT_NAMES:
+        for stat_name in stat_names:
             value_width = len(format_value(table[column_name][stat_name]))
             if value_width > width:
                 width = value_width
@@ -113,7 +126,7 @@ def format_describe_table(table):
         header += f" {column_name:>{column_widths[column_name]}}"
     lines.append(header)
 
-    for stat_name in STAT_NAMES:
+    for stat_name in stat_names:
         line = f"{stat_name:<{row_label_width}}"
         for column_name in column_names:
             value = format_value(table[column_name][stat_name])
@@ -123,6 +136,7 @@ def format_describe_table(table):
     return "\n".join(lines)
 
 
-def describe(csv_path):
+def describe(csv_path, bonus=False):
     table = build_describe_table(csv_path)
-    return format_describe_table(table)
+    stat_names = BONUS_STAT_NAMES if bonus else MANDATORY_STAT_NAMES
+    return format_describe_table(table, stat_names)

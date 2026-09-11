@@ -28,7 +28,7 @@ from src.data_visualization.scatter_plot import (
 )
 from src.data_analysis.describe import (
     DescribeError,
-    STAT_NAMES,
+    BONUS_STAT_NAMES,
     build_describe_table,
 )
 from src.logistic_regression.logreg_train import sigmoid
@@ -228,7 +228,7 @@ def describe_dataset(dataset_name):
         {
             "name": dataset_name,
             "path": str(path.relative_to(ROOT_DIR)),
-            "statistics": list(STAT_NAMES),
+            "statistics": list(BONUS_STAT_NAMES),
             "features": [
                 {"name": feature, "values": values}
                 for feature, values in table.items()

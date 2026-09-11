@@ -28,7 +28,7 @@ def predict_houses(X, model) :
 def predict_house(model, student_values) :
 	pred_temp = 0.0
 	house_pred = ""
-	
+
 	for house in model["houses"] :
 		weights = model["weights"][house]
 		bias = model["biases"][house]
@@ -58,7 +58,7 @@ def prepare_prediction_data(csv_path, model) :
 	rows = load_prediction_rows(csv_path)
 	X = []
 	indexes = []
-	
+
 	for row in rows :
 		student_values = []
 		indexes.append(row["Index"])
@@ -74,23 +74,34 @@ def load_model(model_path) :
 		model = json.load(file)
 	return model
 
+def looks_like_dataset(path) :
+	return str(path).lower().endswith(".csv")
+
+
+def looks_like_weights(path) :
+	return str(path).lower().endswith(".json")
+
 def parse_arguments() :
 	parser = argparse.ArgumentParser(description="Predict Hogwarts houses with a trained logistic regression model.")
 	parser.add_argument("dataset", help="CSV test dataset path")
-	parser.add_argument("model", nargs="?", default="models/weights.json", help="trained model JSON path, default: models/weights.json")
+	parser.add_argument("weights", nargs="?", default="models/weights.json", help="trained weights JSON path, default: models/weights.json")
 	parser.add_argument("--output", default="houses.csv", help="prediction output CSV path, default: houses.csv")
-	return parser.parse_args()
-		
+	args = parser.parse_args()
+
+	if looks_like_weights(args.dataset) and looks_like_dataset(args.weights):
+		args.dataset, args.weights = args.weights, args.dataset
+	return args
+
 
 def main() :
 	args = parse_arguments()
 	try:
-		model = load_model(args.model)
+		model = load_model(args.weights)
 	except FileNotFoundError:
-		print(f"error: model file not found: {args.model}")
+		print(f"error: weights file not found: {args.weights}")
 		return 1
 	except json.JSONDecodeError:
-		print(f"error: invalid JSON model file: {args.model}")
+		print(f"error: invalid JSON weights file: {args.weights}")
 		return 1
 
 	try:

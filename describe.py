@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import logging
-import sys
+import argparse
 
 from src.data_analysis.describe import DescribeError, describe
 
@@ -38,15 +38,24 @@ def configure_logger():
     LOGGER.propagate = False
 
 
+def parse_arguments():
+    parser = argparse.ArgumentParser(description="Describe numerical CSV features.")
+    parser.add_argument("dataset", help="CSV dataset path")
+    parser.add_argument(
+        "--bonus",
+        action="store_true",
+        help="include bonus statistics: missing, variance, range, and IQR",
+    )
+    return parser.parse_args()
+
+
 def main():
     configure_logger()
 
-    if len(sys.argv) != 2:
-        LOGGER.error("usage: %s <dataset.csv>", sys.argv[0])
-        return 1
+    args = parse_arguments()
 
     try:
-        print(describe(sys.argv[1]))
+        print(describe(args.dataset, bonus=args.bonus))
     except DescribeError as error:
         LOGGER.error("%s", error)
         return 1
