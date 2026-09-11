@@ -101,6 +101,43 @@ The distance between the maximum and minimum values.
 
 The distance between the 75th and 25th percentiles. This measures the spread of the middle half of the data.
 
+## Gradient Descent Optimizers
+
+The logistic regression training can use different gradient descent strategies.
+
+The objective is to compare how the model learns depending on how many training examples are used before updating the weights.
+
+### Batch Gradient Descent
+
+Batch gradient descent uses the full training dataset before each weight update.
+
+This gives a stable gradient because every student is used to compute the update.
+
+### Stochastic Gradient Descent
+
+Stochastic gradient descent updates the weights after each individual training example.
+
+In this project, this corresponds to:
+
+```text
+batch_size = 1
+```
+
+This method performs more frequent updates. The learning path can be less stable, but it can help the model move faster during training.
+
+### Mini-Batch Gradient Descent
+
+Mini-batch gradient descent updates the weights after a small group of training examples.
+
+In this project, this corresponds to:
+
+```text
+batch_size = 32
+```
+
+This method is a compromise between batch gradient descent and stochastic gradient descent.
+It keeps the updates more stable than stochastic gradient descent while updating the model more often than full batch gradient descent.
+
 ## Constraints
 
 The following functions are forbidden:
